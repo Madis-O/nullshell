@@ -21,7 +21,25 @@ itself on the GPU.
   `font.family`, or just install one (for example "Symbols Nerd Font Mono" or
   "JetBrainsMono NF") and NullShell uses it for icons automatically.
 
+## Install
+
+```
+.\install.ps1
+```
+
+This builds NullShell, copies `nullshell.exe` to `%LOCALAPPDATA%\Programs\NullShell` and
+adds a **NullShell** entry to the Start menu, which you can pin to the taskbar. No admin
+rights needed. Add `-Desktop` for a desktop shortcut, `-Uninstall` to remove it again.
+
+If PowerShell refuses to run the script, start it with
+`powershell -ExecutionPolicy Bypass -File .\install.ps1`.
+
+The exe is a single self-contained file with its icon built in, so it can also be copied
+anywhere and started by double click.
+
 ## Build and run
+
+To run straight from the source tree without installing:
 
 ```
 cargo run --release
@@ -80,6 +98,10 @@ To turn the styling down: `[effects] enabled = false` removes the shader effects
 ## Code layout
 
 ```
+build.rs         embeds the icon and version info into the exe
+install.ps1      per-user install with Start menu shortcut
+assets/          default config, app icon
+tools/           make_icon.py, regenerates assets/nullshell.ico
 src/
   main.rs        entry point, logging, argument parsing
   app.rs         window + event loop, glue between the three parts below

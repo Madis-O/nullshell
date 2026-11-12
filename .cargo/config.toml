@@ -1,0 +1,4 @@
+# Link the C runtime statically so nullshell.exe runs on machines without the
+# Visual C++ redistributable: one file, nothing else to install.
+[target.'cfg(all(windows, target_env = "msvc"))']
+rustflags = ["-C", "target-feature=+crt-static"]

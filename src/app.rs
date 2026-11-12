@@ -10,7 +10,7 @@ use winit::dpi::LogicalSize;
 use winit::event::{ElementState, Ime, KeyEvent, MouseButton, MouseScrollDelta, StartCause, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy};
 use winit::keyboard::{Key, ModifiersState, NamedKey};
-use winit::platform::windows::{Color, CornerPreference, WindowAttributesExtWindows};
+use winit::platform::windows::{Color, CornerPreference, IconExtWindows, WindowAttributesExtWindows};
 use winit::window::{Fullscreen, Icon, Theme, Window, WindowId};
 
 use crate::color::Rgb;
@@ -198,8 +198,8 @@ impl State {
             .with_min_inner_size(LogicalSize::new(360, 220))
             .with_transparent(translucent)
             .with_theme(Some(Theme::Dark))
-            .with_window_icon(make_icon(cfg))
-            .with_taskbar_icon(make_icon(cfg))
+            .with_window_icon(app_icon())
+            .with_taskbar_icon(app_icon())
             // Shown after the first frame so there is no white flash.
             .with_visible(false)
             // Native title bar, tinted to match (Windows 11).
@@ -594,36 +594,7 @@ impl State {
     }
 }
 
-/// Window icon drawn in code: a cut-corner frame with a `>_` prompt.
-fn make_icon(cfg: &Config) -> Option<Icon> {
-    const N: i32 = 64;
-    const CUT: i32 = 16;
-    let (accent, alt, bg) = (cfg.colors.accent, cfg.colors.accent_alt, cfg.colors.background);
-    let mut rgba = vec![0u8; (N * N * 4) as usize];
-    for y in 0..N {
-        for x in 0..N {
-            // Distance into the shape from the two cut corners.
-            let tl = x + y - CUT;
-            let br = (N - 1 - x) + (N - 1 - y) - CUT;
-            if tl < 0 || br < 0 {
-                continue;
-            }
-            let edge = x.min(y).min(N - 1 - x).min(N - 1 - y);
-            let border = edge < 4 || tl < 6 || br < 6;
-            // Chevron: two diagonal strokes meeting at x = 28.
-            let dy = (y - 30).abs();
-            let chevron = dy <= 11 && (x - (28 - dy)).abs() <= 3;
-            let underscore = (34..50).contains(&x) && (40..45).contains(&y);
-            let color = if border || underscore {
-                accent
-            } else if chevron {
-                alt
-            } else {
-                bg
-            };
-            let i = ((y * N + x) * 4) as usize;
-            rgba[i..i + 4].copy_from_slice(&[color.r, color.g, color.b, 255]);
-        }
-    }
-    Icon::from_rgba(rgba, N as u32, N as u32).ok()
+/// The icon embedded in the exe by build.rs (assets/nullshell.ico).
+fn app_icon() -> Option<Icon> {
+    Icon::from_resource(1, None).ok()
 }
