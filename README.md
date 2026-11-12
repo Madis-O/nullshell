@@ -4,6 +4,11 @@ A standalone terminal emulator for Windows, written in Rust, styled after Cyberp
 Its own window and its own app: it hosts PowerShell 7 through ConPTY and draws everything
 itself on the GPU.
 
+> **Built with AI help.** I made NullShell together with Claude (Anthropic's AI, through
+> Claude Code). I chose the stack, the requirements and the look I wanted; Claude wrote
+> most of the code in this first version and tested it with me. I'm upfront about that
+> because I'd rather you know how it was made. From here on I'm extending it myself.
+
 - winit window, wgpu renderer, cosmic-text for font shaping
 - alacritty_terminal for terminal emulation, portable-pty for ConPTY
 - truecolor, scrollback, mouse selection, copy/paste, mouse reporting for TUI apps
