@@ -129,7 +129,7 @@ impl AnsiColors {
 
     fn bright() -> Self {
         Self {
-            black: Rgb::new(0x4a, 0x46, 0x60),
+            black: Rgb::new(0x7d, 0x78, 0x96),
             red: Rgb::new(0xff, 0x55, 0x78),
             green: Rgb::new(0x6d, 0xff, 0xc4),
             yellow: Rgb::new(0xff, 0xf7, 0x72),
