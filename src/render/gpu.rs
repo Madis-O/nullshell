@@ -12,6 +12,8 @@ pub struct Gpu {
     pub config: wgpu::SurfaceConfiguration,
     /// True when the swapchain blends with the desktop behind the window.
     pub transparent: bool,
+    /// Largest surface side the device can handle.
+    max_size: u32,
 }
 
 impl Gpu {
@@ -59,6 +61,11 @@ impl Gpu {
         }))
         .context("failed to create graphics device")?;
 
+        // A wgpu validation error panics by default. Log it instead: a bad
+        // frame is better than a dead terminal.
+        device.on_uncaptured_error(Arc::new(|e| crate::log(&format!("gpu error: {e}"))));
+        let max_size = device.limits().max_texture_dimension_2d;
+
         let caps = surface.get_capabilities(&adapter);
         // All color math is done in gamma space, like most terminals do, so a
         // non-sRGB surface format is wanted.
@@ -85,8 +92,8 @@ impl Gpu {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format,
             color_space: Default::default(),
-            width: size.width.max(1),
-            height: size.height.max(1),
+            width: size.width.clamp(1, max_size),
+            height: size.height.clamp(1, max_size),
             present_mode: wgpu::PresentMode::AutoVsync,
             desired_maximum_frame_latency: 2,
             alpha_mode,
@@ -94,15 +101,15 @@ impl Gpu {
         };
         surface.configure(&device, &config);
 
-        Ok(Self { device, queue, surface, config, transparent })
+        Ok(Self { device, queue, surface, config, transparent, max_size })
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
         if width == 0 || height == 0 {
             return;
         }
-        self.config.width = width;
-        self.config.height = height;
+        self.config.width = width.min(self.max_size);
+        self.config.height = height.min(self.max_size);
         self.surface.configure(&self.device, &self.config);
     }
 

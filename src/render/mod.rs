@@ -183,7 +183,7 @@ impl Renderer {
             return;
         }
         self.gpu.resize(width, height);
-        self.post.resize(&self.gpu.device, width, height);
+        self.post.resize(&self.gpu.device, self.gpu.config.width, self.gpu.config.height);
         self.update_layout();
     }
 
