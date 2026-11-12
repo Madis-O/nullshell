@@ -27,6 +27,8 @@ program = ""
 args = []
 # Empty = your home folder.
 working_directory = ""
+# Command to run once when the shell opens, e.g. "fastfetch". Empty = none.
+startup_command = ""
 
 [scrollback]
 lines = 10000

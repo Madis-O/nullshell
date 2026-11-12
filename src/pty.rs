@@ -43,7 +43,14 @@ impl Pty {
 
         let mut last_err = None;
         let mut spawned = None;
-        for (program, args) in shell_candidates(shell) {
+        let startup = shell.startup_command.trim();
+        let mut type_startup = false;
+        for (program, mut args) in shell_candidates(shell) {
+            // Known shells take the startup command as an argument, which is
+            // cleaner than typing it. Anything else gets it typed in below.
+            let as_args = if startup.is_empty() { Some(Vec::new()) } else { startup_args(&program, &args, startup) };
+            type_startup = as_args.is_none();
+            args.extend(as_args.unwrap_or_default());
             let mut cmd = CommandBuilder::new(&program);
             cmd.args(&args);
             cmd.cwd(working_directory(shell));
@@ -113,6 +120,10 @@ impl Pty {
             notify(PtyEvent::Exit);
         })?;
 
+        if type_startup {
+            let _ = writer.send(format!("{startup}\r").into_bytes());
+        }
+
         Ok(Self { master: pair.master, writer, killer, output, output_pending, shell_name })
     }
 
@@ -161,6 +172,21 @@ fn working_directory(shell: &ShellConfig) -> PathBuf {
         .filter(|p| p.is_dir())
         .or_else(|| std::env::current_dir().ok())
         .unwrap_or_else(|| PathBuf::from("C:\\"))
+}
+
+/// Arguments that make a known shell run `command` and then stay open.
+/// `None` when the shell is unknown or already has arguments of its own that
+/// these would clash with.
+fn startup_args(program: &Path, args: &[String], command: &str) -> Option<Vec<String>> {
+    let stem = program.file_stem()?.to_string_lossy().to_lowercase();
+    let only_nologo = args.iter().all(|a| a.eq_ignore_ascii_case("-NoLogo"));
+    match stem.as_str() {
+        "pwsh" | "powershell" if only_nologo => {
+            Some(vec!["-NoExit".into(), "-Command".into(), command.into()])
+        }
+        "cmd" if args.is_empty() => Some(vec!["/k".into(), command.into()]),
+        _ => None,
+    }
 }
 
 /// Shells to try, in order: the configured one, then pwsh, powershell, cmd.

@@ -82,6 +82,9 @@ If the config has an error, NullShell starts with the defaults and shows the pro
 red in the status bar. Errors and panics are also written to
 `%APPDATA%\NullShell\nullshell.log`.
 
+To run something every time a window opens, set `startup_command` under `[shell]`, for
+example `startup_command = "fastfetch"`.
+
 To turn the styling down: `[effects] enabled = false` removes the shader effects,
 `[hud] enabled = false` removes the header, frame and status bar.
 

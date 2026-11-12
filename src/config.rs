@@ -57,6 +57,8 @@ pub struct ShellConfig {
     pub program: String,
     pub args: Vec<String>,
     pub working_directory: String,
+    /// Command run once when the shell starts (e.g. "fastfetch").
+    pub startup_command: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
