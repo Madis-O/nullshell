@@ -123,7 +123,10 @@ impl GlyphCache {
         let mut symbol_family: Option<String> = None;
         for face in fonts.db().faces() {
             for (name, _) in &face.families {
-                if !name.contains("Nerd Font") {
+                // Nerd Fonts ship under long names ("... Nerd Font") and short
+                // Windows-friendly ones ("... NF", "... NFM", "... NFP").
+                let short = [" NF", " NFM", " NFP"].iter().any(|s| name.ends_with(s));
+                if !name.contains("Nerd Font") && !short {
                     continue;
                 }
                 let better = match &symbol_family {

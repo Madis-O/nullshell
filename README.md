@@ -18,8 +18,8 @@ itself on the GPU.
 - Optional: [PowerShell 7](https://aka.ms/powershell). Without it NullShell falls back to
   Windows PowerShell, then cmd.
 - Optional: a [Nerd Font](https://www.nerdfonts.com) for icon glyphs. Either set it as
-  `font.family`, or just install one (for example "Symbols Nerd Font Mono") and NullShell
-  uses it for icons automatically.
+  `font.family`, or just install one (for example "Symbols Nerd Font Mono" or
+  "JetBrainsMono NF") and NullShell uses it for icons automatically.
 
 ## Build and run
 
