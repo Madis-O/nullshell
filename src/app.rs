@@ -197,6 +197,10 @@ impl State {
             .with_inner_size(LogicalSize::new(cfg.window.width, cfg.window.height))
             .with_min_inner_size(LogicalSize::new(360, 220))
             .with_transparent(translucent)
+            // A translucent window is drawn only by the GPU swapchain. Without
+            // this, Windows keeps its own opaque backing bitmap behind it, which
+            // shows through as a pale box the size of the old window after a resize.
+            .with_no_redirection_bitmap(translucent)
             .with_theme(Some(Theme::Dark))
             .with_window_icon(app_icon())
             .with_taskbar_icon(app_icon())
