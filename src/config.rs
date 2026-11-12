@@ -231,11 +231,13 @@ impl Default for EffectsConfig {
 #[serde(default)]
 pub struct HudConfig {
     pub enabled: bool,
+    /// Typeface of the header and status bar text.
+    pub font: String,
 }
 
 impl Default for HudConfig {
     fn default() -> Self {
-        Self { enabled: true }
+        Self { enabled: true, font: "Rajdhani".into() }
     }
 }
 

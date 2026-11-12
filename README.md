@@ -15,6 +15,7 @@ itself on the GPU.
 - per-pixel window transparency (text stays solid, only the background fades)
 - HUD chrome, glow, scanlines, chromatic aberration, scan beam, glitch burst on bell
 - pixel-perfect built-in box drawing, block and braille characters
+- HUD text set in Rajdhani (Regular, Medium, SemiBold, Bold), built into the exe
 
 ## Requirements
 
@@ -111,7 +112,7 @@ To turn the styling down: `[effects] enabled = false` removes the shader effects
 ```
 build.rs         embeds the icon and version info into the exe
 install.ps1      per-user install with Start menu shortcut
-assets/          default config, app icon
+assets/          default config, app icon, HUD font (Rajdhani)
 tools/           make_icon.py, regenerates assets/nullshell.ico
 src/
   main.rs        entry point, logging, argument parsing
@@ -164,3 +165,6 @@ src/
 ## License
 
 [MIT](LICENSE)
+
+The bundled Rajdhani font in `assets/fonts` is by Indian Type Foundry and licensed under
+the [SIL Open Font License](assets/fonts/OFL.txt).

@@ -94,7 +94,15 @@ impl Renderer {
     pub fn new(window: Arc<Window>, cfg: &Config) -> Result<Self> {
         let scale = window.scale_factor() as f32;
         let gpu = Gpu::new(window, cfg.window.opacity < 1.0)?;
-        let glyphs = GlyphCache::new(&gpu.device, &gpu.queue, &cfg.font.family, cfg.font.size, cfg.font.line_height, scale);
+        let glyphs = GlyphCache::new(
+            &gpu.device,
+            &gpu.queue,
+            &cfg.font.family,
+            &cfg.hud.font,
+            cfg.font.size,
+            cfg.font.line_height,
+            scale,
+        );
         let scene_pipeline = ScenePipeline::new(&gpu.device);
         let post = PostPipeline::new(&gpu.device, gpu.config.format, gpu.config.width, gpu.config.height);
         let theme = Theme {

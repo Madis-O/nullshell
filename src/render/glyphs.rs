@@ -12,6 +12,23 @@ use cosmic_text::{Attrs, Buffer, Family, FontSystem, Metrics, Shaping, Style, Sw
 pub const STYLE_BOLD: u8 = 1;
 pub const STYLE_ITALIC: u8 = 2;
 
+/// Font weights for HUD text ([`GlyphCache::ui`]).
+pub const UI_REGULAR: u16 = 400;
+pub const UI_MEDIUM: u16 = 500;
+pub const UI_SEMIBOLD: u16 = 600;
+pub const UI_BOLD: u16 = 700;
+
+/// HUD typeface, bundled so the frame looks the same on every machine.
+const UI_FAMILY: &str = "Rajdhani";
+const UI_FONTS: [&[u8]; 4] = [
+    include_bytes!("../../assets/fonts/Rajdhani-Regular.ttf"),
+    include_bytes!("../../assets/fonts/Rajdhani-Medium.ttf"),
+    include_bytes!("../../assets/fonts/Rajdhani-SemiBold.ttf"),
+    include_bytes!("../../assets/fonts/Rajdhani-Bold.ttf"),
+];
+/// HUD text size relative to the terminal font. Rajdhani runs small.
+const UI_SCALE: f32 = 1.18;
+
 const ATLAS_START: u32 = 1024;
 const ATLAS_MAX: u32 = 4096;
 
@@ -89,12 +106,16 @@ pub struct GlyphCache {
     family: String,
     /// Installed Nerd Font used for private-use (icon) code points.
     symbol_family: Option<String>,
+    /// Family used for HUD text.
+    ui_family: String,
     font_pt: f32,
     line_height: f32,
     scale: f32,
     metrics: CellMetrics,
     chars: HashMap<(char, u8), (u32, u32)>,
     clusters: HashMap<(Box<[char]>, u8), (u32, u32)>,
+    /// HUD glyphs by (char, weight): glyph range plus advance width.
+    ui_chars: HashMap<(char, u16), (u32, u32, f32)>,
     glyphs: Vec<Glyph>,
     atlas: Atlas,
     generation: u64,
@@ -106,8 +127,20 @@ pub struct GlyphCache {
 }
 
 impl GlyphCache {
-    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, family: &str, font_pt: f32, line_height: f32, scale: f32) -> Self {
-        let fonts = FontSystem::new();
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        family: &str,
+        ui_family: &str,
+        font_pt: f32,
+        line_height: f32,
+        scale: f32,
+    ) -> Self {
+        let mut fonts = FontSystem::new();
+        for data in UI_FONTS {
+            fonts.db_mut().load_font_data(data.to_vec());
+        }
         let installed = |name: &str| {
             fonts.db().faces().any(|f| f.families.iter().any(|(n, _)| n.eq_ignore_ascii_case(name)))
         };
@@ -119,6 +152,9 @@ impl GlyphCache {
             font_warning = Some(format!("font \"{family}\" not found, using {fallback}"));
             fallback.to_string()
         };
+
+        // The HUD font can be swapped for any installed family in the config.
+        let ui_family = if !ui_family.is_empty() && installed(ui_family) { ui_family } else { UI_FAMILY }.to_string();
 
         let mut symbol_family: Option<String> = None;
         for face in fonts.db().faces() {
@@ -145,12 +181,14 @@ impl GlyphCache {
             swash: SwashCache::new(),
             family,
             symbol_family,
+            ui_family,
             font_pt,
             line_height,
             scale,
             metrics: CellMetrics { cell_w: 8.0, cell_h: 16.0, baseline: 12.0, font_px: 13.0 },
             chars: HashMap::new(),
             clusters: HashMap::new(),
+            ui_chars: HashMap::new(),
             glyphs: Vec::new(),
             atlas: Atlas::new(device, ATLAS_START),
             generation: 0,
@@ -211,6 +249,7 @@ impl GlyphCache {
     fn reset(&mut self, atlas_size: u32) {
         self.chars.clear();
         self.clusters.clear();
+        self.ui_chars.clear();
         self.glyphs.clear();
         self.atlas = Atlas::new(&self.device, atlas_size);
         self.generation += 1;
@@ -236,7 +275,7 @@ impl GlyphCache {
                 Some(r) => *r,
                 None => {
                     let mut tmp = [0u8; 4];
-                    let r = self.rasterize(c.encode_utf8(&mut tmp), c, style);
+                    let r = self.rasterize(c.encode_utf8(&mut tmp), c, style, None).map(|(a, b, _)| (a, b));
                     if let Some(r) = r {
                         self.chars.insert((c, style), r);
                     }
@@ -252,7 +291,7 @@ impl GlyphCache {
                     Some(r) => *r,
                     None => {
                         let text: String = key.0.iter().collect();
-                        let r = self.rasterize(&text, c, style);
+                        let r = self.rasterize(&text, c, style, None).map(|(a, b, _)| (a, b));
                         if let Some(r) = r {
                             self.clusters.insert(key, r);
                         }
@@ -264,30 +303,56 @@ impl GlyphCache {
         &self.glyphs[range.0 as usize..(range.0 + range.1) as usize]
     }
 
-    /// Shape and rasterize `text` into the atlas. `None` means the atlas is
-    /// full; the result must not be cached then.
-    fn rasterize(&mut self, text: &str, first: char, style: u8) -> Option<(u32, u32)> {
+    /// One HUD character in the HUD typeface at the given weight: its glyph
+    /// images and how far to advance. HUD text is proportional, so callers lay
+    /// characters out by advance instead of by cell.
+    pub fn ui(&mut self, c: char, weight: u16) -> (&[Glyph], f32) {
+        let (start, len, advance) = match self.ui_chars.get(&(c, weight)) {
+            Some(r) => *r,
+            None => {
+                let mut tmp = [0u8; 4];
+                let r = self.rasterize(c.encode_utf8(&mut tmp), c, 0, Some(weight));
+                if let Some(r) = r {
+                    self.ui_chars.insert((c, weight), r);
+                }
+                r.unwrap_or((0, 0, 0.0))
+            }
+        };
+        (&self.glyphs[start as usize..(start + len) as usize], advance)
+    }
+
+    /// Shape and rasterize `text` into the atlas, returning the glyph range
+    /// and the total advance. `ui` selects the HUD typeface at that weight.
+    /// `None` means the atlas is full; the result must not be cached then.
+    fn rasterize(&mut self, text: &str, first: char, style: u8, ui: Option<u16>) -> Option<(u32, u32, f32)> {
         let m = self.metrics;
         let family = match &self.symbol_family {
+            _ if ui.is_some() => self.ui_family.as_str(),
             Some(symbols) if is_private_use(first) => symbols.as_str(),
             _ => self.family.as_str(),
         };
+        let font_px = if ui.is_some() { m.font_px * UI_SCALE } else { m.font_px };
         let mut attrs = Attrs::new().family(Family::Name(family));
+        if let Some(weight) = ui {
+            attrs = attrs.weight(Weight(weight));
+        }
         if style & STYLE_BOLD != 0 {
             attrs = attrs.weight(Weight::BOLD);
         }
         if style & STYLE_ITALIC != 0 {
             attrs = attrs.style(Style::Italic);
         }
-        let mut buffer = Buffer::new(&mut self.fonts, Metrics::new(m.font_px, m.cell_h));
+        let mut buffer = Buffer::new(&mut self.fonts, Metrics::new(font_px, m.cell_h));
         buffer.set_size(None, None);
         buffer.set_text(text, &attrs, Shaping::Advanced, None);
         buffer.shape_until_scroll(&mut self.fonts, false);
 
         let start = self.glyphs.len();
+        let mut advance = 0.0;
         let atlas_size = self.atlas.size as f32;
         for run in buffer.layout_runs() {
             for glyph in run.glyphs {
+                advance += glyph.w;
                 let physical = glyph.physical((0.0, 0.0), 1.0);
                 let Some(image) = self.swash.get_image_uncached(&mut self.fonts, physical.cache_key) else {
                     continue;
@@ -342,7 +407,7 @@ impl GlyphCache {
                 });
             }
         }
-        Some((start as u32, (self.glyphs.len() - start) as u32))
+        Some((start as u32, (self.glyphs.len() - start) as u32, advance))
     }
 }
 

@@ -91,3 +91,6 @@ glitch = 1.0
 [hud]
 # Header, frame and status bar drawn around the terminal.
 enabled = true
+# Typeface for the header and status bar. Rajdhani is built in; any installed
+# font family works too.
+font = "Rajdhani"

@@ -3,10 +3,13 @@
 //! Purely decorative plus a few status readouts. It only pushes quads into
 //! the scene, so it is safe to restyle or replace without touching anything
 //! else. A custom title bar or tab strip would live next to this file.
+//!
+//! HUD text uses the HUD typeface (Rajdhani), which is proportional: text is
+//! laid out by each character's advance, not on the terminal's cell grid.
 
 use crate::frame::Frame;
 
-use super::glyphs::{GlyphCache, STYLE_BOLD};
+use super::glyphs::{GlyphCache, UI_BOLD, UI_MEDIUM, UI_REGULAR, UI_SEMIBOLD};
 use super::scene::{corner, Scene};
 use super::{Layout, Theme};
 
@@ -20,47 +23,81 @@ pub struct HudState<'a> {
     pub focused: bool,
 }
 
-/// Draw monospace text on the cell grid starting at `(x, y)`. Returns the x
-/// position after the last character.
-fn text(scene: &mut Scene, glyphs: &mut GlyphCache, x: f32, y: f32, s: &str, color: [f32; 4], style: u8) -> f32 {
-    let cw = glyphs.metrics().cell_w;
+/// Extra space between HUD characters, as a fraction of the cell width.
+/// Wide tracking is a big part of the game's UI look.
+const TRACKING: f32 = 0.12;
+
+/// Width of `s` in the HUD typeface.
+fn measure(glyphs: &mut GlyphCache, s: &str, weight: u16) -> f32 {
+    let track = (glyphs.metrics().cell_w * TRACKING).round();
+    s.chars().map(|c| glyphs.ui(c, weight).1 + track).sum()
+}
+
+/// Draw HUD text with its top at `y` (same vertical box as a terminal row).
+/// Returns the x position after the last character.
+fn text(scene: &mut Scene, glyphs: &mut GlyphCache, x: f32, y: f32, s: &str, color: [f32; 4], weight: u16) -> f32 {
+    let track = (glyphs.metrics().cell_w * TRACKING).round();
     let mut cx = x;
     for c in s.chars() {
-        if c != ' ' {
-            for g in glyphs.get(c, None, style) {
-                scene.glyph(cx + g.left, y + g.top, g.w, g.h, g.uv, color, g.colored);
-            }
+        let (images, advance) = glyphs.ui(c, weight);
+        for g in images {
+            scene.glyph(cx.round() + g.left, y + g.top, g.w, g.h, g.uv, color, g.colored);
         }
-        cx += cw;
+        cx += advance + track;
     }
     cx
 }
 
-/// Shorten `s` to at most `max` characters, marking the cut.
-fn truncate(s: &str, max: usize) -> String {
-    if s.chars().count() <= max {
-        return s.to_string();
+/// Like [`text`], but every digit gets the same slot width, so a ticking
+/// clock does not jiggle as its digits change.
+fn text_fixed(scene: &mut Scene, glyphs: &mut GlyphCache, x: f32, y: f32, s: &str, color: [f32; 4], weight: u16) -> f32 {
+    let (slot, track) = fixed_slot(glyphs, weight);
+    let mut cx = x;
+    for c in s.chars() {
+        let (images, advance) = glyphs.ui(c, weight);
+        let width = if c.is_ascii_digit() { slot } else { (advance + track).ceil() };
+        let inset = ((width - advance) / 2.0).round();
+        for g in images {
+            scene.glyph(cx + inset + g.left, y + g.top, g.w, g.h, g.uv, color, g.colored);
+        }
+        cx += width;
     }
-    if max <= 2 {
-        return String::new();
-    }
-    let mut out: String = s.chars().take(max - 2).collect();
-    out.push_str("..");
-    out
+    cx
 }
 
-/// Like [`truncate`], but keeps the end: for a path that is the part that matters.
-fn truncate_start(s: &str, max: usize) -> String {
-    let len = s.chars().count();
-    if len <= max {
+/// Width [`text_fixed`] will use for `s`.
+fn measure_fixed(glyphs: &mut GlyphCache, s: &str, weight: u16) -> f32 {
+    let (slot, track) = fixed_slot(glyphs, weight);
+    s.chars()
+        .map(|c| if c.is_ascii_digit() { slot } else { (glyphs.ui(c, weight).1 + track).ceil() })
+        .sum()
+}
+
+/// Digit slot width (the widest digit plus tracking) and the tracking itself.
+fn fixed_slot(glyphs: &mut GlyphCache, weight: u16) -> (f32, f32) {
+    let track = (glyphs.metrics().cell_w * TRACKING).round();
+    let widest = ('0'..='9').map(|c| glyphs.ui(c, weight).1).fold(0.0, f32::max);
+    ((widest + track).ceil(), track)
+}
+
+/// Shorten `s` until it fits in `max_width`. `keep_end` drops characters from
+/// the start instead (for a path, the end is the part that matters).
+fn fit(glyphs: &mut GlyphCache, s: &str, weight: u16, max_width: f32, keep_end: bool) -> String {
+    if measure(glyphs, s, weight) <= max_width {
         return s.to_string();
     }
-    if max <= 2 {
-        return String::new();
+    let chars: Vec<char> = s.chars().collect();
+    for keep in (1..chars.len()).rev() {
+        let candidate: String = if keep_end {
+            "..".chars().chain(chars[chars.len() - keep..].iter().copied()).collect()
+        } else {
+            chars[..keep].iter().copied().chain("..".chars()).collect()
+        };
+        if measure(glyphs, &candidate, weight) <= max_width {
+            return candidate;
+        }
     }
-    let mut out = String::from("..");
-    out.extend(s.chars().skip(len - (max - 2)));
-    out
+    String::new()
 }
 
 pub fn draw(
@@ -93,10 +130,10 @@ pub fn draw(
     let tag_y = px(4.0);
     let tag_h = header_h - px(8.0);
     let label = "NULLSHELL";
-    let tag_w = cw * (label.len() as f32 + 2.0);
+    let tag_w = (measure(glyphs, label, UI_BOLD) + cw * 2.0).round();
     scene.cut_rect(pad, tag_y, tag_w, tag_h, accent.rgba(dim), px(8.0), corner::BR, 0.0);
     let text_y = tag_y + ((tag_h - ch) / 2.0).round();
-    text(scene, glyphs, pad + cw, text_y, label, dark, STYLE_BOLD);
+    text(scene, glyphs, pad + cw, text_y, label, dark, UI_BOLD);
 
     // Three shrinking bars trailing the tag.
     let mut bx = pad + tag_w + px(5.0);
@@ -106,9 +143,9 @@ pub fn draw(
     }
 
     // Clock on the right, with a pulsing status light.
-    let clock_w = cw * hud.clock.chars().count() as f32;
-    let clock_x = w - pad - clock_w;
-    text(scene, glyphs, clock_x, text_y, hud.clock, accent.rgba(0.9 * dim), 0);
+    let clock_w = measure_fixed(glyphs, hud.clock, UI_SEMIBOLD);
+    let clock_x = (w - pad - clock_w).round();
+    text_fixed(scene, glyphs, clock_x, text_y, hud.clock, accent.rgba(0.9 * dim), UI_SEMIBOLD);
     let pulse = if hud.focused { 0.55 + 0.45 * (time * 2.4).sin() } else { 0.3 };
     let light = px(7.0);
     let light_x = clock_x - cw - light;
@@ -116,11 +153,13 @@ pub fn draw(
 
     // Window title between the two.
     let title_x = bx + cw;
-    let room = ((light_x - cw - title_x) / cw).floor().max(0.0) as usize;
-    if room > 6 {
-        let title = truncate_start(&hud.title.to_uppercase(), room - 3);
-        let x = text(scene, glyphs, title_x, text_y, "//", alert.rgba(0.9 * dim), STYLE_BOLD);
-        text(scene, glyphs, x + cw, text_y, &title, alt.rgba(0.85 * dim), 0);
+    let slashes = "//";
+    let title_start = title_x + measure(glyphs, slashes, UI_BOLD) + cw;
+    let room = light_x - cw - title_start;
+    if room > cw * 4.0 {
+        let title = fit(glyphs, &hud.title.to_uppercase(), UI_MEDIUM, room, true);
+        text(scene, glyphs, title_x, text_y, slashes, alert.rgba(0.9 * dim), UI_BOLD);
+        text(scene, glyphs, title_start, text_y, &title, alt.rgba(0.9 * dim), UI_MEDIUM);
     }
 
     // Rule under the header, heavier under the tag.
@@ -169,20 +208,20 @@ pub fn draw(
 
     // Shell name in an outlined tag.
     let shell = format!(">_ {}", hud.shell.to_uppercase());
-    let shell_w = cw * (shell.chars().count() as f32 + 2.0);
+    let shell_w = (measure(glyphs, &shell, UI_BOLD) + cw * 2.0).round();
     scene.cut_rect(pad, bar_y, shell_w, bar_h, alt.rgba(0.10 * dim), px(7.0), corner::TL, 0.0);
     scene.cut_rect(pad, bar_y, shell_w, bar_h, alt.rgba(0.85 * dim), px(7.0), corner::TL, px(1.0));
-    text(scene, glyphs, pad + cw, label_y, &shell, alt.rgba(dim), STYLE_BOLD);
+    text(scene, glyphs, pad + cw, label_y, &shell, alt.rgba(dim), UI_BOLD);
 
     let mut x = pad + shell_w + cw;
-    let size = format!("{}x{}", frame.cols, frame.rows);
-    x = text(scene, glyphs, x, label_y, &size, theme.foreground.rgba(0.55 * dim), 0) + cw;
+    let size = format!("{} x {}", frame.cols, frame.rows);
+    x = text(scene, glyphs, x, label_y, &size, theme.foreground.rgba(0.6 * dim), UI_MEDIUM) + cw;
 
     if frame.display_offset > 0 {
         let hist = format!("HISTORY -{}", frame.display_offset);
-        let hw = cw * (hist.len() as f32 + 2.0);
+        let hw = (measure(glyphs, &hist, UI_BOLD) + cw * 2.0).round();
         scene.cut_rect(x, bar_y, hw, bar_h, alert.rgba(1.0), px(7.0), corner::BR, 0.0);
-        text(scene, glyphs, x + cw, label_y, &hist, [1.0, 1.0, 1.0, 1.0], STYLE_BOLD);
+        text(scene, glyphs, x + cw, label_y, &hist, [1.0, 1.0, 1.0, 1.0], UI_BOLD);
         x += hw + cw;
     }
 
@@ -197,16 +236,16 @@ pub fn draw(
         right -= px(1.0);
     }
     let readout = "UTF-8 // CONPTY";
-    let readout_x = right - cw - cw * readout.len() as f32;
+    let readout_x = (right - cw - measure(glyphs, readout, UI_REGULAR)).round();
 
     if let Some(warning) = hud.warning {
-        let room = ((readout_x - cw - x) / cw).floor().max(0.0) as usize;
-        if room > 8 {
-            let msg = truncate(&format!("! {warning}"), room);
-            text(scene, glyphs, x, label_y, &msg, alert.rgba(1.0), STYLE_BOLD);
+        let room = readout_x - cw - x;
+        if room > cw * 8.0 {
+            let msg = fit(glyphs, &format!("! {warning}"), UI_SEMIBOLD, room, false);
+            text(scene, glyphs, x, label_y, &msg, alert.rgba(1.0), UI_SEMIBOLD);
         }
     }
     if readout_x > x {
-        text(scene, glyphs, readout_x, label_y, readout, theme.foreground.rgba(0.35 * dim), 0);
+        text(scene, glyphs, readout_x, label_y, readout, theme.foreground.rgba(0.4 * dim), UI_REGULAR);
     }
 }
