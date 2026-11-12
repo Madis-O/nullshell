@@ -29,6 +29,9 @@ args = []
 working_directory = ""
 # Command to run once when the shell opens, e.g. "fastfetch". Empty = none.
 startup_command = ""
+# Show the current folder in the header and title bar (PowerShell and cmd).
+# false = show whatever title the shell sets itself.
+cwd_title = true
 
 [scrollback]
 lines = 10000

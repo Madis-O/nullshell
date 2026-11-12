@@ -82,6 +82,9 @@ If the config has an error, NullShell starts with the defaults and shows the pro
 red in the status bar. Errors and panics are also written to
 `%APPDATA%\NullShell\nullshell.log`.
 
+The header and title bar show the shell's current folder (PowerShell and cmd). Set
+`cwd_title = false` under `[shell]` to show the shell's own title instead.
+
 To run something every time a window opens, set `startup_command` under `[shell]`, for
 example `startup_command = "fastfetch"`.
 

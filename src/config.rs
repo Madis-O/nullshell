@@ -51,7 +51,7 @@ impl Default for WindowConfig {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Default, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(default)]
 pub struct ShellConfig {
     pub program: String,
@@ -59,6 +59,20 @@ pub struct ShellConfig {
     pub working_directory: String,
     /// Command run once when the shell starts (e.g. "fastfetch").
     pub startup_command: String,
+    /// Show the shell's current folder as the window / header title.
+    pub cwd_title: bool,
+}
+
+impl Default for ShellConfig {
+    fn default() -> Self {
+        Self {
+            program: String::new(),
+            args: Vec::new(),
+            working_directory: String::new(),
+            startup_command: String::new(),
+            cwd_title: true,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]

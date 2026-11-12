@@ -49,6 +49,20 @@ fn truncate(s: &str, max: usize) -> String {
     out
 }
 
+/// Like [`truncate`], but keeps the end: for a path that is the part that matters.
+fn truncate_start(s: &str, max: usize) -> String {
+    let len = s.chars().count();
+    if len <= max {
+        return s.to_string();
+    }
+    if max <= 2 {
+        return String::new();
+    }
+    let mut out = String::from("..");
+    out.extend(s.chars().skip(len - (max - 2)));
+    out
+}
+
 pub fn draw(
     scene: &mut Scene,
     glyphs: &mut GlyphCache,
@@ -104,7 +118,7 @@ pub fn draw(
     let title_x = bx + cw;
     let room = ((light_x - cw - title_x) / cw).floor().max(0.0) as usize;
     if room > 6 {
-        let title = truncate(&hud.title.to_uppercase(), room - 3);
+        let title = truncate_start(&hud.title.to_uppercase(), room - 3);
         let x = text(scene, glyphs, title_x, text_y, "//", alert.rgba(0.9 * dim), STYLE_BOLD);
         text(scene, glyphs, x + cw, text_y, &title, alt.rgba(0.85 * dim), 0);
     }

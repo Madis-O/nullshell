@@ -46,17 +46,21 @@ impl Pty {
         let startup = shell.startup_command.trim();
         let mut type_startup = false;
         for (program, mut args) in shell_candidates(shell) {
-            // Known shells take the startup command as an argument, which is
-            // cleaner than typing it. Anything else gets it typed in below.
-            let as_args = if startup.is_empty() { Some(Vec::new()) } else { startup_args(&program, &args, startup) };
-            type_startup = as_args.is_none();
-            args.extend(as_args.unwrap_or_default());
+            // Known shells get the startup command (and the title hook) as
+            // arguments, which is cleaner than typing. Others get it typed in below.
+            let setup = shell_setup(&program, &args, startup, shell.cwd_title);
+            type_startup = setup.is_none() && !startup.is_empty();
+            let setup = setup.unwrap_or_default();
+            args.extend(setup.args);
             let mut cmd = CommandBuilder::new(&program);
             cmd.args(&args);
             cmd.cwd(working_directory(shell));
             cmd.env("TERM", "xterm-256color");
             cmd.env("COLORTERM", "truecolor");
             cmd.env("TERM_PROGRAM", "NullShell");
+            if let Some(prompt) = setup.prompt {
+                cmd.env("PROMPT", prompt);
+            }
             match pair.slave.spawn_command(cmd) {
                 Ok(child) => {
                     spawned = Some((child, program));
@@ -174,17 +178,55 @@ fn working_directory(shell: &ShellConfig) -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("C:\\"))
 }
 
-/// Arguments that make a known shell run `command` and then stay open.
-/// `None` when the shell is unknown or already has arguments of its own that
-/// these would clash with.
-fn startup_args(program: &Path, args: &[String], command: &str) -> Option<Vec<String>> {
+/// PowerShell: wrap whatever prompt is in place (including one from the user's
+/// profile) so every prompt also sets the window title to the current folder.
+const PWSH_CWD_TITLE: &str = "$global:__nullshell_prompt = $function:prompt; \
+function global:prompt { \
+$Host.UI.RawUI.WindowTitle = $ExecutionContext.SessionState.Path.CurrentLocation.Path; \
+& $global:__nullshell_prompt }";
+
+/// cmd: the default `path>` prompt, preceded by an escape sequence that sets
+/// the window title to the current folder.
+const CMD_CWD_PROMPT: &str = r"$E]0;$P$E\$P$G";
+
+#[derive(Default)]
+struct ShellSetup {
+    args: Vec<String>,
+    /// Value for the `PROMPT` environment variable (cmd only).
+    prompt: Option<&'static str>,
+}
+
+/// How to make a known shell run the startup command and report its current
+/// folder as the window title. `None` when the shell is unknown or already
+/// has arguments of its own that these would clash with.
+fn shell_setup(program: &Path, args: &[String], startup: &str, cwd_title: bool) -> Option<ShellSetup> {
     let stem = program.file_stem()?.to_string_lossy().to_lowercase();
     let only_nologo = args.iter().all(|a| a.eq_ignore_ascii_case("-NoLogo"));
     match stem.as_str() {
         "pwsh" | "powershell" if only_nologo => {
-            Some(vec!["-NoExit".into(), "-Command".into(), command.into()])
+            let mut parts = Vec::new();
+            if cwd_title {
+                parts.push(PWSH_CWD_TITLE);
+            }
+            if !startup.is_empty() {
+                parts.push(startup);
+            }
+            let mut setup = ShellSetup::default();
+            if !parts.is_empty() {
+                setup.args = vec!["-NoExit".into(), "-Command".into(), parts.join("; ")];
+            }
+            Some(setup)
         }
-        "cmd" if args.is_empty() => Some(vec!["/k".into(), command.into()]),
+        "cmd" if args.is_empty() => {
+            let mut setup = ShellSetup::default();
+            if !startup.is_empty() {
+                setup.args = vec!["/k".into(), startup.into()];
+            }
+            if cwd_title {
+                setup.prompt = Some(CMD_CWD_PROMPT);
+            }
+            Some(setup)
+        }
         _ => None,
     }
 }

@@ -44,10 +44,16 @@ $built = Join-Path $repo "target\release\nullshell.exe"
 if (-not (Test-Path $built)) { throw "not found: $built (build first, or drop -NoBuild)" }
 
 New-Item -ItemType Directory -Force $installDir | Out-Null
+$stale = "$exe.old"
+Remove-Item $stale -Force -ErrorAction SilentlyContinue
 try {
     Copy-Item $built $exe -Force
 } catch {
-    throw "could not replace $exe - close any running NullShell windows and try again"
+    # A running NullShell locks its exe, but Windows still lets it be renamed.
+    # Open windows keep running the old copy; new ones get the new build.
+    Move-Item $exe $stale -Force
+    Copy-Item $built $exe -Force
+    "NullShell is running: open windows keep the old version until you reopen them."
 }
 
 function New-Shortcut($path) {
