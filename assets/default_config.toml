@@ -1,0 +1,88 @@
+# NullShell configuration
+# Loaded once at startup. Delete this file to get a fresh copy of the defaults.
+# Colors are "#rrggbb".
+
+[font]
+# Any installed monospace font. A Nerd Font (e.g. "CaskaydiaCove Nerd Font")
+# gives you icons; otherwise NullShell looks for any installed Nerd Font to
+# use for icon glyphs only.
+family = "Cascadia Mono"
+# Size in points.
+size = 12.0
+# Line height as a multiple of the font size.
+line_height = 1.25
+
+[window]
+# 1.0 = solid, lower values let the desktop show through.
+opacity = 0.93
+# Initial size in logical pixels.
+width = 1100
+height = 680
+# Square window corners on Windows 11.
+square_corners = true
+
+[shell]
+# Empty = auto detect: pwsh (PowerShell 7), then powershell, then cmd.
+program = ""
+args = []
+# Empty = your home folder.
+working_directory = ""
+
+[scrollback]
+lines = 10000
+
+[cursor]
+# "block", "beam" or "underline". Programs can still change it.
+shape = "block"
+blink = true
+
+[colors]
+foreground = "#c5f6fa"
+background = "#08070d"
+cursor = "#fcee0a"
+cursor_text = "#08070d"
+selection_background = "#ff003c"
+selection_foreground = "#ffffff"
+# HUD / frame colors.
+accent = "#fcee0a"
+accent_alt = "#00f0ff"
+alert = "#ff003c"
+
+[colors.normal]
+black = "#12101a"
+red = "#ff003c"
+green = "#00ff9f"
+yellow = "#fcee0a"
+blue = "#3d7bff"
+magenta = "#d833ff"
+cyan = "#00f0ff"
+white = "#c8d3d5"
+
+[colors.bright]
+black = "#4a4660"
+red = "#ff5578"
+green = "#6dffc4"
+yellow = "#fff772"
+blue = "#7aa5ff"
+magenta = "#ee7dff"
+cyan = "#8af8ff"
+white = "#ffffff"
+
+[effects]
+# Master switch for the post-process shader.
+enabled = true
+# Animated effects (scan beam, noise) redraw at ~30 fps while focused.
+animate = true
+# Each value is a strength, 0.0 turns that effect off.
+scanlines = 0.10
+glow = 0.45
+aberration = 0.6
+vignette = 0.35
+scan_beam = 0.05
+noise = 0.02
+# Short glitch burst on startup and on the terminal bell.
+glitch = 1.0
+
+[hud]
+# Header, frame and status bar drawn around the terminal.
+enabled = true

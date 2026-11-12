@@ -1,0 +1,32 @@
+[package]
+name = "nullshell"
+version = "0.1.0"
+edition = "2021"
+description = "A cyberpunk terminal emulator for Windows"
+
+[dependencies]
+winit = "0.30"
+wgpu = "30"
+cosmic-text = "0.19"
+alacritty_terminal = "0.26"
+portable-pty = "0.9"
+serde = { version = "1", features = ["derive"] }
+toml = "1"
+arboard = { version = "3", default-features = false }
+bytemuck = { version = "1", features = ["derive"] }
+pollster = "1"
+bitflags = "2"
+anyhow = "1"
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_System_SystemInformation",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[profile.dev]
+opt-level = 1
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = true
