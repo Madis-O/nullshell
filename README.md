@@ -154,3 +154,7 @@ src/
 - Rounded box corners, double lines, blocks and braille are drawn by NullShell, not the
   font, so TUI borders never show gaps. Dashed box lines are drawn solid.
 - Font ligatures are not supported: every cell is shaped on its own to keep the grid exact.
+
+## License
+
+[MIT](LICENSE)

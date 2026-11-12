@@ -3,6 +3,7 @@ name = "nullshell"
 version = "0.1.0"
 edition = "2021"
 description = "A cyberpunk terminal emulator for Windows"
+license = "MIT"
 
 [dependencies]
 winit = "0.30"
