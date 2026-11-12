@@ -16,7 +16,7 @@ line_height = 1.25
 # 1.0 = solid, lower values let the desktop show through.
 opacity = 0.93
 # Initial size in logical pixels.
-width = 1100
+width = 1200
 height = 680
 # Square window corners on Windows 11.
 square_corners = true

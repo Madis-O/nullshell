@@ -47,7 +47,7 @@ pub struct WindowConfig {
 
 impl Default for WindowConfig {
     fn default() -> Self {
-        Self { opacity: 0.93, width: 1100, height: 680, square_corners: true }
+        Self { opacity: 0.93, width: 1200, height: 680, square_corners: true }
     }
 }
 
